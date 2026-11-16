@@ -58,6 +58,11 @@ export const itemsCollection = (opts: ResolvedRoadmapOptions): CollectionConfig 
       admin: { position: 'sidebar', description: 'From the title when empty.' },
     },
     { name: 'key', type: 'text', index: true, admin: { hidden: true } },
+    // Set only by the sync functions (overrideAccess); nobody writes them through the API.
+    { name: 'sourceKey', type: 'text', index: true, admin: { position: 'sidebar', readOnly: true, description: 'The item source this came from. Its title, description and votes follow the source.' }, access: { create: () => false, update: () => false } },
+    { name: 'externalId', type: 'text', index: true, admin: { hidden: true }, access: { create: () => false, update: () => false } },
+    { name: 'sourceVotes', type: 'number', admin: { position: 'sidebar', readOnly: true, description: 'The source\'s own vote count.' }, access: { create: () => false, update: () => false } },
+    { name: 'sourceGone', type: 'checkbox', defaultValue: false, admin: { position: 'sidebar', readOnly: true, description: 'The source no longer lists this item.' }, access: { create: () => false, update: () => false } },
     {
       name: 'voteCount',
       type: 'number',
@@ -282,6 +287,7 @@ export const votesCollection = (opts: ResolvedRoadmapOptions): CollectionConfig 
             req,
           })
           if (!item || (item as { hidden?: boolean }).hidden) throw new APIError('That roadmap item is not open for votes.', 400)
+          if ((item as { sourceKey?: string }).sourceKey) throw new APIError('Vote for this on the page it came from. It does not take votes here.', 400)
           if (opts.scopeField) data[opts.scopeField] = idOf((item as unknown as Record<string, unknown>)[opts.scopeField]) || undefined
           return data
         },

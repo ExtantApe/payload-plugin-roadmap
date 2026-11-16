@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 2026-11-16: item sources and `votes.lock`
+
+Suite: 47 → 55 tests in 4 files. New `test/sources.test.ts` runs real Payload on in-memory MongoDB with two sites (locking default, locking off). Made-up data only.
+
+- **Covered.** Sync creates items; re-sync updates title, count and text with no duplicates and leaves stage and hidden alone; a removed source item is marked, not deleted, and unmarked when it returns; unknown source refused; a source item refuses a vote through the API, `castVote` and `allocateVotes`; signed-out and non-staff cannot create or update source fields, and staff cannot set them through the API either; placed votes stay locked by default and withdraw at once with `votes.lock: false`.
+- **Skipped.** The field access flags on their own (the API tests cover them).
+- **Not tested.** Tags (ignored), `scopeField` sites, very large sources, concurrent syncs, Postgres and SQLite. No mutation checks run.
+
 ## 2026-11-11: catalog categories couldn't start without a `scopeField`
 
 Suite: 45 → 47 tests in 3 files. Real Payload on an in-memory MongoDB replica set, one database per site. Made-up categories only.

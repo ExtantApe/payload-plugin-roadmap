@@ -221,7 +221,7 @@ export async function allocateVotes(payload: Payload, args: { item: string; user
  * item in a release stage can be withdrawn at once.
  */
 export const unlocksAt = (opts: ResolvedRoadmapOptions, createdAt: string, stage?: string | null) => {
-  if (releases(opts, stage)) return null
+  if (releases(opts, stage) || !opts.votes.lock) return null
   const days = opts.allocation?.lockDays ?? 0
   const at = new Date(new Date(createdAt).getTime() + days * 864e5)
   return at.getTime() > Date.now() ? at.toISOString() : null

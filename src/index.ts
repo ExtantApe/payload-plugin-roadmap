@@ -6,7 +6,7 @@ import { docsAfterChange, docsAfterDelete, docsFeatures } from './docs'
 import { noticesCollection } from './notices'
 import type { ResolvedRoadmapOptions, RoadmapPluginOptions } from './types'
 
-export type { CatalogStatus, RoadmapNotice, RoadmapNoticeField, RoadmapOption, RoadmapPluginOptions, ResolvedRoadmapOptions } from './types'
+export type { ItemSource, ItemSourceConfig, SourceItem, CatalogStatus, RoadmapNotice, RoadmapNoticeField, RoadmapOption, RoadmapPluginOptions, ResolvedRoadmapOptions } from './types'
 export { getNoticeRules, matchingNotices } from './notices'
 export type { NoticeRule } from './notices'
 export {
@@ -30,6 +30,7 @@ export {
   withdrawVotes,
 } from './api'
 export type { RoadmapItemDoc } from './api'
+export { syncItemSource, syncItemSources } from './sources'
 export { catalogStatus, getCatalog } from './catalog'
 export { docsFeatures, type DocsFeature } from './docs'
 export type { CatalogEntry, CatalogSection } from './catalog'
@@ -50,6 +51,8 @@ const resolve = (o: RoadmapPluginOptions): ResolvedRoadmapOptions => ({
   subject: o.subject,
   scopeField: o.scopeField,
   allocation: o.allocation,
+  itemSources: o.itemSources ?? [],
+  votes: { lock: o.votes?.lock ?? true },
   slugs: { items: 'roadmap-items', votes: 'roadmap-votes', notices: 'roadmap-notices', categories: 'roadmap-categories', ...o.slugs },
   notices: { fields: o.notices?.fields ?? [] },
   catalog: o.catalog
