@@ -3,9 +3,11 @@ import type { CollectionSlug, Payload } from 'payload'
 import { optionsOf, RoadmapError } from './api'
 import type { ItemSourceConfig, SourceItem } from './types'
 
+export type SyncResult = { created: number; updated: number; gone: number; errors: { externalId: string; message: string }[] }
+
 type Existing = { id: string; sourceGone?: boolean | null }
 
-/** Slug from the source key and id, so two sources can't collide on a board. */
+/** Display slug only. The unique key is `source:<key>:<id>`, set by the items hook, so slugs may repeat. */
 const slugFor = (key: string, externalId: string) =>
   `${key}-${externalId}`
     .toLowerCase()
@@ -28,11 +30,12 @@ const syncOne = async (payload: Payload, cfg: ItemSourceConfig) => {
       })[]
     ).map((d) => [d.externalId, d]),
   )
-  const result = { created: 0, updated: 0, gone: 0 }
+  const result: SyncResult = { created: 0, updated: 0, gone: 0, errors: [] }
   const seen = new Set<string>()
   for (const s of listed) {
     if (seen.has(s.externalId)) continue
     seen.add(s.externalId)
+    try {
     const votes = Math.max(0, Math.floor(Number(s.votes) || 0))
     const have = known.get(s.externalId)
     const shared = { title: s.title, summary: s.description ?? '', sourceVotes: votes, voteCount: votes, sourceGone: false }
@@ -43,11 +46,15 @@ const syncOne = async (payload: Payload, cfg: ItemSourceConfig) => {
     } else {
       await payload.create({
         collection: items,
-        data: { ...shared, board: cfg.board, stage, slug: slugFor(key, s.externalId), sourceKey: key, externalId: s.externalId } as never,
+        data: { ...shared, board: cfg.board, stage, slug: slugFor(key, s.externalId), sourceKey: key, externalId: s.externalId, ...(opts.scopeField && cfg.scope ? { [opts.scopeField]: cfg.scope } : {}) } as never,
         overrideAccess: true,
         context: { roadmapInternal: true },
       })
       result.created++
+    }
+    } catch (error) {
+      // One bad item never stops the rest.
+      result.errors.push({ externalId: String(s.externalId), message: error instanceof Error ? error.message : 'Could not sync this item.' })
     }
   }
   // Never deleted: a curator may have edited it. Marked, so the site can say the source dropped it.
@@ -68,7 +75,7 @@ export async function syncItemSource(payload: Payload, key: string) {
 
 /** Sync every configured item source. Server only; runs with overrideAccess. */
 export async function syncItemSources(payload: Payload) {
-  const out: Record<string, { created: number; updated: number; gone: number }> = {}
+  const out: Record<string, SyncResult> = {}
   for (const cfg of optionsOf(payload).itemSources) out[cfg.source.key] = await syncOne(payload, cfg)
   return out
 }

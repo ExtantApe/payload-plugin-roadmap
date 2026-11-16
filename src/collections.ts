@@ -1,6 +1,6 @@
 import { APIError, type Access, type CollectionConfig, type CollectionSlug, type Field, type Where } from 'payload'
 
-import { FREE_BALLOT, idOf, itemKey, mergeItems, recountVotes, releases, slugify, unlocksAt } from './api'
+import { FREE_BALLOT, SOURCE_ITEM_MESSAGE, idOf, itemKey, mergeItems, recountVotes, releases, slugify, unlocksAt } from './api'
 import { catalogItemFields } from './catalog'
 import type { ResolvedRoadmapOptions } from './types'
 
@@ -93,7 +93,7 @@ export const itemsCollection = (opts: ResolvedRoadmapOptions): CollectionConfig 
         description: 'Combine this item into a similar one: its votes move there and this item is hidden. Cannot be undone.',
       },
       filterOptions: ({ id, data }): Where => ({
-        and: [{ id: { not_equals: id } }, { board: { equals: data?.board } }, { mergedInto: { exists: false } }] as Where[],
+        and: [{ id: { not_equals: id } }, { board: { equals: data?.board } }, { mergedInto: { exists: false } }, { sourceKey: { exists: false } }] as Where[],
       }),
     },
     {
@@ -137,6 +137,8 @@ export const itemsCollection = (opts: ResolvedRoadmapOptions): CollectionConfig 
               req,
             })) as Record<string, unknown> | null
             const doc = { ...originalDoc, ...data }
+            if (into?.sourceKey || originalDoc?.sourceKey)
+              throw new APIError('Items from a source can’t be merged into or out of. Hide the item instead.', 400)
             if (
               !into ||
               into.id === originalDoc?.id ||
@@ -150,7 +152,10 @@ export const itemsCollection = (opts: ResolvedRoadmapOptions): CollectionConfig 
           if (!slug) throw new APIError('A title is required.', 400)
           const subject = 'subject' in data ? data.subject : originalDoc?.subject
           const subjectChanged = operation === 'create' || idOf(subject) !== idOf(originalDoc?.subject)
-          const next: Record<string, unknown> = { ...data, slug, key: itemKey(subject, slug) }
+          const origin = { ...originalDoc, ...data } as { sourceKey?: string; externalId?: string }
+          // Source items get a key no request can produce (requests are `slug:` or `subject:`).
+          const key = origin.sourceKey ? `source:${origin.sourceKey}:${origin.externalId}` : itemKey(subject, slug)
+          const next: Record<string, unknown> = { ...data, slug, key }
           if (opts.subject?.parentOf && subjectChanged) {
             const parentSubject = idOf(subject) ? await opts.subject.parentOf({ id: idOf(subject), req }) : null
             next.parentSubject = parentSubject ?? null
@@ -257,8 +262,22 @@ export const votesCollection = (opts: ResolvedRoadmapOptions): CollectionConfig 
     ],
     hooks: {
       beforeChange: [
-        async ({ data, operation, req }) => {
-          if (operation !== 'create') return data
+        async ({ data, originalDoc, operation, req }) => {
+          if (operation !== 'create') {
+            // Moving a vote onto a source item would spend it where it doesn't count.
+            if (data?.item && idOf(data.item) !== idOf(originalDoc?.item)) {
+              const target = await req.payload.findByID({
+                collection: opts.slugs.items as CollectionSlug,
+                id: idOf(data.item),
+                depth: 0,
+                overrideAccess: true,
+                disableErrors: true,
+                req,
+              })
+              if ((target as { sourceKey?: string } | null)?.sourceKey) throw new APIError('Votes can’t be moved onto an item from a source.', 400)
+            }
+            return data
+          }
           // API voters cast their own free vote; extra votes go through allocateVotes.
           // Curators and the server's own Local API calls (no user) may set any voter.
           // Everyone else must be a signed-in account of usersSlug, voting as itself,
@@ -287,7 +306,7 @@ export const votesCollection = (opts: ResolvedRoadmapOptions): CollectionConfig 
             req,
           })
           if (!item || (item as { hidden?: boolean }).hidden) throw new APIError('That roadmap item is not open for votes.', 400)
-          if ((item as { sourceKey?: string }).sourceKey) throw new APIError('Vote for this on the page it came from. It does not take votes here.', 400)
+          if ((item as { sourceKey?: string }).sourceKey) throw new APIError(SOURCE_ITEM_MESSAGE, 400)
           if (opts.scopeField) data[opts.scopeField] = idOf((item as unknown as Record<string, unknown>)[opts.scopeField]) || undefined
           return data
         },

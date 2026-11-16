@@ -35,7 +35,7 @@ export type ItemSource = {
 }
 
 /** Connects a source to a board: its items become ordinary Roadmap items. */
-export type ItemSourceConfig = { source: ItemSource; board: string; /** Stage for new items. Default: the first stage. */ status?: string }
+export type ItemSourceConfig = { source: ItemSource; board: string; /** Stage for new items. Default: the first stage. */ status?: string; /** The scopeField value for new items, when the plugin has a scopeField. */ scope?: string }
 
 export type RoadmapPluginOptions = {
   slugs?: { items?: string; votes?: string; notices?: string; categories?: string }
@@ -79,7 +79,7 @@ export type RoadmapPluginOptions = {
    * They show the source's vote count and take no Roadmap votes.
    */
   itemSources?: ItemSourceConfig[]
-  /** Vote settings per site. */
+  /** Vote settings for the whole Payload config. */
   votes?: {
     /**
      * Whether `allocation.lockDays` holds placed votes until they unlock. Default true.

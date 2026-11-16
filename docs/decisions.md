@@ -6,4 +6,4 @@ The owner, 2026-11-16: "languages should appear with everything else and yes, vo
 
 - Roadmap takes external items through an `itemSources` option and sync functions. They become ordinary items, so they appear with everything else on a board. Neither plugin imports the other; the source shape is a structural type here.
 - Sync never deletes: an item a source stops listing is marked `sourceGone`, because a curator may have edited it. Roadmap's own fields are left alone, and source items take no Roadmap votes so nothing is counted twice.
-- Vote locking is `votes.lock`, default `true` (today's behavior). `false` ignores `allocation.lockDays` for that site.
+- Vote locking is `votes.lock`, default `true` (today's behavior). `false` ignores `allocation.lockDays` for the whole config (one setting per Payload config, not per site). Source items can't be merged into or out of, and take no moved votes. Their key is namespaced so requests can't collide with it.

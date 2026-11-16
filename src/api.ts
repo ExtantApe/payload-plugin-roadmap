@@ -14,6 +14,7 @@ export type RoadmapItemDoc = {
   board: string
   stage: string
   key: string
+  sourceKey?: string | null
   voteCount?: number | null
   parent?: string | { id: string } | null
   [field: string]: unknown
@@ -50,6 +51,8 @@ const isDuplicate = (error: unknown) => {
 
 /** A user's free vote on an item has this ballot; placed (allocated) votes get a unique one each. */
 export const FREE_BALLOT = 'free'
+
+export const SOURCE_ITEM_MESSAGE = 'Vote for this on the page it came from. It does not take votes here.'
 
 /** Refusals meant for the voter (not enough votes, still locked…). */
 export class RoadmapError extends Error {}
@@ -95,6 +98,7 @@ const findVote = async (payload: Payload, item: string, user: string) =>
 
 /** The free vote: one per user per item; returns the existing vote if there is one. */
 export async function castVote(payload: Payload, args: { item: string; user: string; note?: string }) {
+  if ((await getItem(payload, args.item))?.sourceKey) throw new RoadmapError(SOURCE_ITEM_MESSAGE)
   const existing = await findVote(payload, args.item, args.user)
   if (existing) return { vote: existing, created: false }
   try {
@@ -184,6 +188,7 @@ export async function allocateVotes(payload: Payload, args: { item: string; user
   if (!(votes >= 1)) throw new RoadmapError('Choose at least one vote.')
   const item = await getItem(payload, args.item)
   if (!item || item.hidden) throw new RoadmapError('That roadmap item is not open for votes.')
+  if (item.sourceKey) throw new RoadmapError(SOURCE_ITEM_MESSAGE)
   if (opts.allocation.boards && !opts.allocation.boards.includes(item.board)) throw new RoadmapError('Extra votes can’t be placed on this roadmap.')
   if (releases(opts, item.stage)) throw new RoadmapError('This item is not planned, so it can’t take extra votes.')
   for (let attempt = 1; ; attempt++) {
@@ -301,6 +306,8 @@ export async function mergeItems(payload: Payload, args: { from: string; into: s
   const opts = optionsOf(payload)
   const { req } = args
   if (args.from === args.into) throw new RoadmapError('An item can’t be merged into itself.')
+  for (const id of [args.from, args.into])
+    if ((await getItem(payload, id))?.sourceKey) throw new RoadmapError('Items from a source can’t be merged into or out of.')
   const find = async (where: Where) =>
     (
       await payload.find({

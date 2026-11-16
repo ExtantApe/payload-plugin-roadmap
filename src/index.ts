@@ -44,7 +44,14 @@ export const DEFAULT_STAGES = [
   { label: 'Not planned', value: 'declined' },
 ]
 
-const resolve = (o: RoadmapPluginOptions): ResolvedRoadmapOptions => ({
+const resolve = (o: RoadmapPluginOptions): ResolvedRoadmapOptions => {
+  if (o.votes?.lock !== undefined && typeof o.votes.lock !== 'boolean') throw new Error('roadmapPlugin: votes.lock must be true or false.')
+  const days = o.allocation?.lockDays
+  if (days !== undefined && !(Number.isFinite(days) && days >= 0)) throw new Error('roadmapPlugin: allocation.lockDays must be a number of 0 or more.')
+  return build(o)
+}
+
+const build = (o: RoadmapPluginOptions): ResolvedRoadmapOptions => ({
   usersSlug: o.usersSlug ?? 'users',
   boards: o.boards?.length ? o.boards : [{ label: 'Features', value: 'features' }],
   stages: o.stages?.length ? o.stages : DEFAULT_STAGES,

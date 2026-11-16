@@ -3,7 +3,7 @@ import { MongoMemoryReplSet } from 'mongodb-memory-server'
 import { buildConfig, getPayload, type Payload } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { allocateVotes, castVote, syncItemSource, syncItemSources, withdrawVotes, roadmapPlugin, type SourceItem } from '../src/index.js'
+import { allocateVotes, castVote, mergeItems, requestItem, syncItemSource, syncItemSources, withdrawVotes, roadmapPlugin, type SourceItem } from '../src/index.js'
 
 // Item sources and vote locking on real Payload over an in-memory MongoDB. Made-up data only.
 type Doc = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -66,7 +66,7 @@ describe('item sources', () => {
       { externalId: 'lang:aa', title: 'Made-up tongue', description: 'About it', votes: 3 },
       { externalId: 'lang:bb', title: 'Other tongue', votes: 0 },
     ]
-    expect(await syncItemSources(a)).toEqual({ 'made-up-source': { created: 2, updated: 0, gone: 0 } })
+    expect(await syncItemSources(a)).toEqual({ 'made-up-source': { created: 2, updated: 0, gone: 0, errors: [] } })
     const docs = await items(a)
     expect(docs).toHaveLength(2)
     expect(docs.find((d) => d.externalId === 'lang:aa')).toMatchObject({ title: 'Made-up tongue', summary: 'About it', voteCount: 3, sourceVotes: 3, board: 'features', stage: 'requested', sourceKey: 'made-up-source', sourceGone: false })
@@ -79,7 +79,7 @@ describe('item sources', () => {
       { externalId: 'lang:aa', title: 'Made-up tongue (renamed)', votes: 9 },
       { externalId: 'lang:bb', title: 'Other tongue', votes: 1 },
     ]
-    expect((await syncItemSource(a, 'made-up-source'))).toEqual({ created: 0, updated: 2, gone: 0 })
+    expect((await syncItemSource(a, 'made-up-source'))).toEqual({ created: 0, updated: 2, gone: 0, errors: [] })
     const docs = await items(a)
     expect(docs).toHaveLength(2)
     expect(docs.find((d) => d.externalId === 'lang:aa')).toMatchObject({ title: 'Made-up tongue (renamed)', voteCount: 9, sourceVotes: 9, stage: 'planned', hidden: true })
@@ -102,13 +102,19 @@ describe('item sources', () => {
   })
 
   it('refuses a Roadmap vote on a source item, through the API and the server helpers', async () => {
-    const id = String((await items(a)).find((d) => d.externalId === 'lang:aa')!.id)
-    await expect(castVote(a, { item: id, user: String(voterA.id) })).rejects.toThrow()
+    const doc = (await items(a)).find((d) => d.externalId === 'lang:aa')!
+    const id = String(doc.id)
+    await a.update({ collection: 'roadmap-items' as never, id, data: { hidden: false } as never, overrideAccess: true })
+    await expect(castVote(a, { item: id, user: String(voterA.id) })).rejects.toThrow(/page it came from/)
     await expect(
       a.create({ collection: 'roadmap-votes' as never, data: { item: id } as never, user: asUser(voterA), overrideAccess: false }),
-    ).rejects.toThrow()
-    await expect(allocateVotes(a, { item: id, user: String(voterA.id), votes: 1 })).rejects.toThrow()
+    ).rejects.toThrow(/page it came from/)
+    await expect(
+      a.create({ collection: 'roadmap-votes' as never, data: { item: id, user: curatorA.id } as never, user: asUser(curatorA), overrideAccess: false }),
+    ).rejects.toThrow(/page it came from/)
+    await expect(allocateVotes(a, { item: id, user: String(voterA.id), votes: 1 })).rejects.toThrow(/page it came from/)
     expect((await items(a)).find((d) => String(d.id) === id)!.voteCount).toBe(9)
+    await a.update({ collection: 'roadmap-items' as never, id, data: { hidden: true } as never, overrideAccess: true })
   })
 
   it('does not let signed-out or non-staff users write source fields', async () => {
@@ -126,14 +132,72 @@ describe('item sources', () => {
     await a.update({ collection: 'roadmap-items' as never, id: doc.id, data: { sourceVotes: 99, sourceGone: true, externalId: 'zzz' } as never, user: asUser(curatorA), overrideAccess: false })
     expect((await items(a)).find((d) => d.id === doc.id)).toMatchObject({ sourceVotes: 9, sourceGone: false, externalId: doc.externalId })
   })
+
+  it('refuses merging into or out of a source item, and moving a vote onto one', async () => {
+    const src = (await items(a)).find((d) => d.externalId === 'lang:aa')!
+    const plain = (await a.create({ collection: 'roadmap-items' as never, data: { title: 'Made-up plain', board: 'features' } as never, overrideAccess: true })) as Doc
+    const vote = (await a.create({ collection: 'roadmap-votes' as never, data: { item: plain.id, user: voterB.id } as never, overrideAccess: true })) as Doc
+    const asCurator = { user: asUser(curatorA), overrideAccess: false }
+    await expect(a.update({ collection: 'roadmap-items' as never, id: plain.id, data: { mergedInto: src.id } as never, ...asCurator })).rejects.toThrow(/can’t be merged into or out of/)
+    await expect(a.update({ collection: 'roadmap-items' as never, id: src.id, data: { mergedInto: plain.id } as never, ...asCurator })).rejects.toThrow(/can’t be merged into or out of/)
+    await expect(mergeItems(a, { from: plain.id, into: src.id })).rejects.toThrow(/merged into or out of/)
+    await expect(mergeItems(a, { from: src.id, into: plain.id })).rejects.toThrow(/merged into or out of/)
+    await expect(a.update({ collection: 'roadmap-votes' as never, id: vote.id, data: { item: src.id } as never, ...asCurator })).rejects.toThrow(/can’t be moved onto/)
+    const after = await items(a)
+    expect(after.find((d) => d.id === src.id)).toMatchObject({ voteCount: 9, hidden: true })
+    expect(after.find((d) => d.id === plain.id)).toMatchObject({ voteCount: 1 })
+    expect(after.find((d) => d.id === plain.id)!.mergedInto).toBeFalsy()
+  })
+
+  it('gives source items a key no request can claim, and one bad item never stops the sync', async () => {
+    // A request whose title slugifies to the old source slug.
+    await requestItem(a, { board: 'features', title: 'made-up-source lang aa', user: String(voterB.id) } as never)
+    listed = [
+      { externalId: 'lang:zu', title: 'Zu tongue', votes: 1 },
+      { externalId: 'lang-zu', title: 'Zu again', votes: 2 },
+      { externalId: 'lang:empty', title: '', votes: 1 },
+      { externalId: 'lang:last', title: 'Last tongue', votes: 4 },
+    ]
+    const res = await syncItemSource(a, 'made-up-source')
+    expect(res.created).toBe(3)
+    expect(res.errors).toHaveLength(1)
+    expect(res.errors[0]).toMatchObject({ externalId: 'lang:empty' })
+    const docs = await items(a)
+    expect(docs.find((d) => d.externalId === 'lang:last')).toMatchObject({ voteCount: 4, key: 'source:made-up-source:lang:last' })
+    expect(docs.filter((d) => ['lang:zu', 'lang-zu'].includes(d.externalId))).toHaveLength(2)
+    // The items left out of this list are marked gone, so gone-marking still ran.
+    expect(docs.find((d) => d.externalId === 'lang:aa')).toMatchObject({ sourceGone: true })
+  })
 })
 
 describe('votes.lock', () => {
   const place = async (p: Payload, user: Doc) => {
-    const item = (await p.create({ collection: 'roadmap-items' as never, data: { title: `Made-up ${p === a ? 'a' : 'b'}`, board: 'features' } as never, overrideAccess: true })) as Doc
+    const item = (await p.create({ collection: 'roadmap-items' as never, data: { title: `Made-up ${p === a ? 'a' : 'b'} ${Math.random().toString(36).slice(2, 8)}`, board: 'features' } as never, overrideAccess: true })) as Doc
     await allocateVotes(p, { item: String(item.id), user: String(user.id), votes: 2 })
     return String(item.id)
   }
+
+  const placed = async (p: Payload, user: Doc) => {
+    const id = await place(p, user)
+    const v = (await p.find({ collection: 'roadmap-votes' as never, where: { item: { equals: id } }, overrideAccess: true })).docs[0] as Doc
+    return String(v.id)
+  }
+
+  it('on: a voter cannot delete a locked placed vote through the API (403)', async () => {
+    const vote = await placed(a, voterB)
+    await expect(a.delete({ collection: 'roadmap-votes' as never, id: vote, user: asUser(voterB), overrideAccess: false })).rejects.toMatchObject({
+      status: 403,
+      message: 'These votes are still committed.',
+    })
+    expect((await a.find({ collection: 'roadmap-votes' as never, where: { id: { equals: vote } }, overrideAccess: true })).totalDocs).toBe(1)
+  })
+
+  it('off: the same API delete succeeds', async () => {
+    const user = (await b.create({ collection: 'users', data: { email: 'v4@example.com', password: PASSWORD } as never })) as Doc
+    const vote = await placed(b, user)
+    await b.delete({ collection: 'roadmap-votes' as never, id: vote, user: { ...user, collection: 'users' } as never, overrideAccess: false })
+    expect((await b.find({ collection: 'roadmap-votes' as never, where: { id: { equals: vote } }, overrideAccess: true })).totalDocs).toBe(0)
+  })
 
   it('on by default: placed votes stay committed for lockDays', async () => {
     const id = await place(a, voterA)
