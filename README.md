@@ -76,11 +76,38 @@ Add the plugin before plugins that wrap collections it creates (e.g. list `roadm
 | `access.manage` | nobody | Who edits items and sees every vote |
 | `access.vote` | any signed-in user | Who may vote through the API. Only accounts of `usersSlug` can vote, always as themselves with weight 1; a vote that names another voter, a weight or a ballot is refused (403). Accounts from other auth collections never vote, see or delete votes unless `manage` lets them |
 | `allocation` | off | `{ earned: ({ payload, user, scope }) => Promise<number>, lockDays?, boards?, releaseStages? }`: extra votes |
+| `itemSources` | none | `[{ source, board, status?, scope? }]`: items synced from another plugin (below). `scope` is the `scopeField` value for new items |
+| `votes.lock` | `true` | `false` lets voters withdraw placed votes at any time, ignoring `allocation.lockDays` |
 | `notices` | off | `{ fields: [{ name, label, options, boards? }] }`: conditional notices (below) |
 | `catalog` | off | `{ boards?, availableStages?, progressStages?, hiddenStages? }`: features catalog (below) |
 | `overrides.items` / `.votes` / `.notices` / `.categories` | | `(collection) => collection` |
 
 The public reads items that are not `hidden`. Voters read and delete only their own votes.
+
+### Item sources
+
+Another plugin can offer items to a board without either plugin importing the other. A source is
+`{ key, list({ payload }) => Promise<{ externalId, title, description?, votes, tags? }[]> }`.
+
+```ts
+roadmapPlugin({ itemSources: [{ source: mySource, board: 'features', status: 'requested' }] })
+
+await syncItemSources(payload)                    // every source
+await syncItemSource(payload, 'my-source-key')    // one, e.g. from the source's afterChange hook
+```
+
+Sync creates ordinary items keyed by source key and `externalId`, and later updates only the
+title, the summary and the source's vote count. Status, curator notes and hiding stay as staff
+set them. An item the source stops listing is marked `sourceGone`, never deleted. Source items
+show the source's count and refuse Roadmap votes, so nothing is counted twice. The source fields
+can't be written through the API, by anyone; the sync functions write with `overrideAccess`, so
+call them from server code only. A sync returns `errors` for items it skipped. Source items can't be merged into or out of. Tags are not stored yet.
+
+### Vote locking
+
+`allocation.lockDays` holds placed votes until they unlock. `votes: { lock: false }` turns that off
+for the whole Payload config (one setting, not one per site): placed votes can be withdrawn at any time. The default is `true`, as before. The one free
+vote per item was never locked.
 
 ### Conditional notices
 

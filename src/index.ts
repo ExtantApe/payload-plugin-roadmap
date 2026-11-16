@@ -6,7 +6,7 @@ import { docsAfterChange, docsAfterDelete, docsFeatures } from './docs'
 import { noticesCollection } from './notices'
 import type { ResolvedRoadmapOptions, RoadmapPluginOptions } from './types'
 
-export type { CatalogStatus, RoadmapNotice, RoadmapNoticeField, RoadmapOption, RoadmapPluginOptions, ResolvedRoadmapOptions } from './types'
+export type { ItemSource, ItemSourceConfig, SourceItem, CatalogStatus, RoadmapNotice, RoadmapNoticeField, RoadmapOption, RoadmapPluginOptions, ResolvedRoadmapOptions } from './types'
 export { getNoticeRules, matchingNotices } from './notices'
 export type { NoticeRule } from './notices'
 export {
@@ -30,6 +30,7 @@ export {
   withdrawVotes,
 } from './api'
 export type { RoadmapItemDoc } from './api'
+export { syncItemSource, syncItemSources } from './sources'
 export { catalogStatus, getCatalog } from './catalog'
 export { docsFeatures, type DocsFeature } from './docs'
 export type { CatalogEntry, CatalogSection } from './catalog'
@@ -43,13 +44,22 @@ export const DEFAULT_STAGES = [
   { label: 'Not planned', value: 'declined' },
 ]
 
-const resolve = (o: RoadmapPluginOptions): ResolvedRoadmapOptions => ({
+const resolve = (o: RoadmapPluginOptions): ResolvedRoadmapOptions => {
+  if (o.votes?.lock !== undefined && typeof o.votes.lock !== 'boolean') throw new Error('roadmapPlugin: votes.lock must be true or false.')
+  const days = o.allocation?.lockDays
+  if (days !== undefined && !(Number.isFinite(days) && days >= 0)) throw new Error('roadmapPlugin: allocation.lockDays must be a number of 0 or more.')
+  return build(o)
+}
+
+const build = (o: RoadmapPluginOptions): ResolvedRoadmapOptions => ({
   usersSlug: o.usersSlug ?? 'users',
   boards: o.boards?.length ? o.boards : [{ label: 'Features', value: 'features' }],
   stages: o.stages?.length ? o.stages : DEFAULT_STAGES,
   subject: o.subject,
   scopeField: o.scopeField,
   allocation: o.allocation,
+  itemSources: o.itemSources ?? [],
+  votes: { lock: o.votes?.lock ?? true },
   slugs: { items: 'roadmap-items', votes: 'roadmap-votes', notices: 'roadmap-notices', categories: 'roadmap-categories', ...o.slugs },
   notices: { fields: o.notices?.fields ?? [] },
   catalog: o.catalog

@@ -17,6 +17,26 @@ export type RoadmapNotice = { id: string; message: string; confirm: boolean }
 /** How catalog entries are labeled, from their stage and audience. */
 export type CatalogStatus = 'available' | 'members' | 'in-progress' | 'planned'
 
+/** One external item a plugin offers to Roadmap. Structural: no import from the plugin that supplies it. */
+export type SourceItem = {
+  /** Stable within the source, e.g. 'lang:zu'. */
+  externalId: string
+  title: string
+  description?: string
+  /** The source's own count. Roadmap shows it and never edits it. */
+  votes: number
+  tags?: string[]
+}
+
+/** What a source gives Roadmap. */
+export type ItemSource = {
+  key: string
+  list: (args: { payload: unknown }) => Promise<SourceItem[]>
+}
+
+/** Connects a source to a board: its items become ordinary Roadmap items. */
+export type ItemSourceConfig = { source: ItemSource; board: string; /** Stage for new items. Default: the first stage. */ status?: string; /** The scopeField value for new items, when the plugin has a scopeField. */ scope?: string }
+
 export type RoadmapPluginOptions = {
   slugs?: { items?: string; votes?: string; notices?: string; categories?: string }
   /** The auth collection whose accounts vote. Default 'users'. */
@@ -52,6 +72,20 @@ export type RoadmapPluginOptions = {
     manage?: Access
     /** Who may cast/remove their own vote through the REST/GraphQL API. Default: any signed-in user. */
     vote?: Access
+  }
+  /**
+   * External item sources (e.g. language requests from another plugin). Items sync into
+   * ordinary Roadmap items with `syncItemSources(payload)` or `syncItemSource(payload, key)`.
+   * They show the source's vote count and take no Roadmap votes.
+   */
+  itemSources?: ItemSourceConfig[]
+  /** Vote settings for the whole Payload config. */
+  votes?: {
+    /**
+     * Whether `allocation.lockDays` holds placed votes until they unlock. Default true.
+     * False lets voters withdraw placed votes at any time.
+     */
+    lock?: boolean
   }
   /**
    * Extra ("free agent") votes a user can place anywhere, several on one item
@@ -110,6 +144,8 @@ export type RoadmapPluginOptions = {
 
 export type ResolvedRoadmapOptions = Required<Pick<RoadmapPluginOptions, 'usersSlug' | 'boards' | 'stages'>> &
   Pick<RoadmapPluginOptions, 'subject' | 'scopeField' | 'allocation'> & {
+    itemSources: ItemSourceConfig[]
+    votes: { lock: boolean }
     slugs: { items: string; votes: string; notices: string; categories: string }
     notices: { fields: RoadmapNoticeField[] }
     catalog?: { boards: string[]; availableStages: string[]; progressStages: string[]; hiddenStages: string[]; docs?: { name: string } }
