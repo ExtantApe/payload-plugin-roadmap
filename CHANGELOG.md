@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 (2026-11-26)
 
 - New: `itemSources` option with `syncItemSources(payload)` and `syncItemSource(payload, key)`. External items become ordinary Roadmap items keyed by source key and id; sync updates title, summary and the source's vote count, marks vanished items `sourceGone` (never deletes), and leaves status and curator fields alone. Source items refuse Roadmap votes (a `RoadmapError` from `castVote` and `allocateVotes`), can't be merged into or out of, and can't have votes moved onto them. Their key is `source:<key>:<id>`, which no request can claim; one item that fails to sync is skipped and listed in `errors` on the result, and the rest still sync. `ItemSourceConfig.scope` sets the `scopeField` value for new items. `ItemSource` and `SourceItem` are structural types with no import from another plugin.
 - New: `votes.lock` (default `true`), one setting for the whole Payload config. `false` lets voters withdraw placed votes at any time. `votes.lock` must be a boolean and `allocation.lockDays` a number of 0 or more, or the plugin refuses to start.

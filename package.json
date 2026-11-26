@@ -1,6 +1,6 @@
 {
   "name": "@extantape/payload-plugin-roadmap",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "Roadmaps for Payload: public roadmap and voting, with items in curator-set stages, one vote per person per item, deduplicated requests and parent grouping.",
   "homepage": "https://github.com/ExtantApe/payload-plugin-roadmap#readme",
   "bugs": {
