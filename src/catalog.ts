@@ -1,7 +1,7 @@
 import type { CollectionConfig, CollectionSlug, Field, Payload, PayloadRequest, TypedLocale, Where } from 'payload'
 
 import { idOf, slugify } from './api'
-import { isSafeLink } from './links'
+import { isSafeLink, safeLinks } from './links'
 import type { CatalogStatus, ResolvedRoadmapOptions } from './types'
 
 /** The label of a catalog entry from its stage and audience; null when it is left out. */
@@ -170,7 +170,7 @@ export async function getCatalog(
         status,
         details: (i.details ?? []).map((d) => d.text),
         // Checked again on the way out, so a link saved before the check was tightened is never served.
-        links: (i.links ?? []).filter((l) => isSafeLink(l.href)).map((l) => ({ label: l.label, href: l.href })),
+        links: safeLinks(i.links).map((l) => ({ label: typeof l.label === 'string' ? l.label : l.href, href: l.href })),
         votes: i.voteCount ?? 0,
       },
     ])

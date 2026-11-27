@@ -3,7 +3,8 @@
 ## 0.5.1 (2026-11-26)
 
 - Security fix: catalog links could send readers to another site. The `href` check only looked for a leading `/` or `https://`, so `//evil.example` and `/\evil.example` passed as site paths, and browsers open both as links to that host (a tab or newline between the slashes works too, since browsers strip them). A site path now starts with one `/` and has no backslash, space or control character, and an https link must parse with a host and no user name or password. The same check runs when the catalog is read, so links saved before this release are dropped from `getCatalog()`, and the docs source keeps only clean site paths. `isSitePath`, `isHttpsLink` and `isSafeLink` are exported for sites that render links of their own.
-- Tested: 60 tests pass (1 new). The admin check refuses `//`, `/\`, tab and newline forms, `https://` with no host, a user and password in the link, and values that aren't text; `getCatalog()` drops stored bad links and keeps good ones; the docs source drops the same forms. All three failed before the fix.
+- Also refused, after review: site paths with `.` or `..` segments (`/..//evil.example` resolves to `//evil.example`) and with an encoded slash or backslash (`%2F`, `%5C`). A stored `links` value that isn't a list, or holds null or non-object entries, is now skipped when read instead of throwing.
+- Tested: 61 tests pass (2 new). The admin check refuses `//`, `/\`, tab and newline forms, `https://` with no host, a user and password in the link, and values that aren't text; `getCatalog()` drops stored bad links and keeps good ones; the docs source drops the same forms. All of these failed before the fix, including the dot-segment, encoded-slash and malformed-list cases.
 - Not tested: links in a real browser; host sites that render `href` without `getCatalog()`.
 
 ## 0.5.0 (2026-11-26)

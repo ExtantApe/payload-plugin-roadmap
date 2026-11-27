@@ -4,7 +4,7 @@ import type { CollectionAfterChangeHook, CollectionAfterDeleteHook, CollectionSl
 
 import { idOf } from './api'
 import { catalogStatus } from './catalog'
-import { isSitePath } from './links'
+import { isSitePath, safeLinks } from './links'
 import type { ResolvedRoadmapOptions } from './types'
 
 /** What a docs plugin's feature looks like. Kept here so this plugin imports nothing from it. */
@@ -28,7 +28,7 @@ function featureOf(opts: ResolvedRoadmapOptions, item: Doc, category: Doc | null
   const status = catalogStatus(opts, String(item.stage), item.audience)
   if (!status) return null
   const details = ((item.details ?? []) as { text?: string }[]).map((d) => d.text ?? '').filter(Boolean).join('\n')
-  const links = ((item.links ?? []) as { href?: string }[]).map((l) => l.href ?? '').filter(isSitePath)
+  const links = safeLinks(item.links, isSitePath).map((l) => l.href)
   const base = { id: String(item.id), section: { key: String(category.slug ?? category.id), title: String(category.title) }, title: String(item.title), summary: item.summary ?? undefined, details: details || undefined, stage: status, links }
   // The version changes whenever words a page is written from change.
   const version = createHash('sha256').update(JSON.stringify(base)).digest('hex').slice(0, 16)
