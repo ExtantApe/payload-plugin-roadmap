@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1 (2026-11-26)
+
+- Security fix: catalog links could send readers to another site. The `href` check only looked for a leading `/` or `https://`, so `//evil.example` and `/\evil.example` passed as site paths, and browsers open both as links to that host (a tab or newline between the slashes works too, since browsers strip them). A site path now starts with one `/` and has no backslash, space or control character, and an https link must parse with a host and no user name or password. The same check runs when the catalog is read, so links saved before this release are dropped from `getCatalog()`, and the docs source keeps only clean site paths. `isSitePath`, `isHttpsLink` and `isSafeLink` are exported for sites that render links of their own.
+- Tested: 60 tests pass (1 new). The admin check refuses `//`, `/\`, tab and newline forms, `https://` with no host, a user and password in the link, and values that aren't text; `getCatalog()` drops stored bad links and keeps good ones; the docs source drops the same forms. All three failed before the fix.
+- Not tested: links in a real browser; host sites that render `href` without `getCatalog()`.
+
 ## 0.5.0 (2026-11-26)
 
 - New: `itemSources` option with `syncItemSources(payload)` and `syncItemSource(payload, key)`. External items become ordinary Roadmap items keyed by source key and id; sync updates title, summary and the source's vote count, marks vanished items `sourceGone` (never deletes), and leaves status and curator fields alone. Source items refuse Roadmap votes (a `RoadmapError` from `castVote` and `allocateVotes`), can't be merged into or out of, and can't have votes moved onto them. Their key is `source:<key>:<id>`, which no request can claim; one item that fails to sync is skipped and listed in `errors` on the result, and the rest still sync. `ItemSourceConfig.scope` sets the `scopeField` value for new items. `ItemSource` and `SourceItem` are structural types with no import from another plugin.

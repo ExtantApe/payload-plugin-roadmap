@@ -122,7 +122,7 @@ describe('access', () => {
     const href = links.fields[0]!.fields.find((f) => f.name === 'href')!
     expect(href.validate('/climate')).toBe(true)
     expect(href.validate('https://example.com')).toBe(true)
-    for (const bad of ['javascript:alert(1)', 'http://example.com', 'data:text/html,x', 'climate']) expect(href.validate(bad)).not.toBe(true)
+    for (const bad of ['javascript:alert(1)', 'http://example.com', 'data:text/html,x', 'climate', '//evil.example', '/\\evil.example', '/\t/evil.example', '/\n/evil.example', 'https://', 'https://user:pw@evil.example', 42, null]) expect(href.validate(bad)).not.toBe(true)
   })
 })
 

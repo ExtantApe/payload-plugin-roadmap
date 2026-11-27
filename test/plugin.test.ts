@@ -180,7 +180,7 @@ describe('docs feature source', () => {
           ? { docs: [{ id: 'c1', slug: 'climate', title: 'Climate' }] }
           : {
               docs: [
-                { id: 'a', board: 'features', title: 'Score', summary: 'S', stage: 'released', category: 'c1', details: [{ text: 'd1' }], links: [{ href: '/score' }, { href: 'https://x.example' }] },
+                { id: 'a', board: 'features', title: 'Score', summary: 'S', stage: 'released', category: 'c1', details: [{ text: 'd1' }], links: [{ href: '/score' }, { href: 'https://x.example' }, { href: '//evil.example' }, { href: '/\\evil.example' }, { href: '/\t/evil.example' }] },
                 { id: 'b', board: 'features', title: 'Gone', stage: 'declined', category: 'c1' },
                 { id: 'c', board: 'features', title: 'Members', stage: 'released', audience: 'members', category: 'c1' },
                 { id: 'd', board: 'features', title: 'Merged', stage: 'released', category: 'c1', mergedInto: 'a' },

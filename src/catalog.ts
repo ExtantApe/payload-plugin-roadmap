@@ -1,6 +1,7 @@
 import type { CollectionConfig, CollectionSlug, Field, Payload, PayloadRequest, TypedLocale, Where } from 'payload'
 
 import { idOf, slugify } from './api'
+import { isSafeLink } from './links'
 import type { CatalogStatus, ResolvedRoadmapOptions } from './types'
 
 /** The label of a catalog entry from its stage and audience; null when it is left out. */
@@ -81,7 +82,7 @@ export const catalogItemFields = (opts: ResolvedRoadmapOptions): Field[] => {
           type: 'row',
           fields: [
             { name: 'label', type: 'text', required: true },
-            { name: 'href', type: 'text', required: true, validate: (v: unknown) => (typeof v === 'string' && /^(\/|https:\/\/)/.test(v) ? true : 'Start with / or https://') },
+            { name: 'href', type: 'text', required: true, validate: (v: unknown) => (isSafeLink(v) ? true : 'Use a path on this site that starts with one / (like /climate), or an https:// link.') },
           ],
         },
       ],
@@ -168,7 +169,8 @@ export async function getCatalog(
         summary: i.summary ?? null,
         status,
         details: (i.details ?? []).map((d) => d.text),
-        links: (i.links ?? []).map((l) => ({ label: l.label, href: l.href })),
+        // Checked again on the way out, so a link saved before the check was tightened is never served.
+        links: (i.links ?? []).filter((l) => isSafeLink(l.href)).map((l) => ({ label: l.label, href: l.href })),
         votes: i.voteCount ?? 0,
       },
     ])
