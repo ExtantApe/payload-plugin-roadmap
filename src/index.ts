@@ -33,6 +33,7 @@ export type { RoadmapItemDoc } from './api'
 export { syncItemSource, syncItemSources } from './sources'
 export { catalogStatus, getCatalog } from './catalog'
 export { docsFeatures, type DocsFeature } from './docs'
+export { isHttpsLink, isSafeLink, isSitePath } from './links'
 export type { CatalogEntry, CatalogSection } from './catalog'
 
 export const DEFAULT_STAGES = [

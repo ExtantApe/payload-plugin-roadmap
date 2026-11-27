@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 2026-11-26: catalog links could point off the site (K805)
+
+- **Promise:** catalog links go only to a path on the site or an https link.
+- **Gap found:** the check let `//host` and `/\host` through as site paths, an open redirect. No test tried them, and nothing checked links already stored.
+- **Added:** off-site forms in the admin check (`test/access-and-votes.test.ts`), a read-side test that `getCatalog()` drops stored bad links (`test/links.test.ts`), and the same forms in the docs source test (`test/plugin.test.ts`). All three failed on 0.5.0 and pass on 0.5.1. After review: dot segments, `%2F` and `%5C` added to the admin check and links test, and a read-side test that a malformed stored `links` value is skipped without throwing (`test/links.test.ts`); 3 tests failed on the reviewed head and pass now.
+- **Skipped:** a real browser test. The forms tested are the ones browsers are documented to treat as another host.
+
 ## 2026-11-16: item sources and `votes.lock`
 
 Suite: 47 → 55 tests in 4 files. New `test/sources.test.ts` runs real Payload on in-memory MongoDB with two sites (locking default, locking off). Made-up data only.
